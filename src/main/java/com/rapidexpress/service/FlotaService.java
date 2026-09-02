@@ -245,6 +245,43 @@ public class FlotaService {
     }
 
     /**
+     * Lee y BLOQUEA el vehiculo sobre la conexion recibida. Pensado para que el
+     * modulo de rutas valide capacidad y estado dentro de SU transaccion.
+     */
+    public Vehiculo buscarPorIdBloqueando(Connection cn, int idVehiculo) throws SQLException {
+        return vehiculoDAO.buscarPorIdBloqueando(cn, idVehiculo);
+    }
+
+    /**
+     * Version transaccional de iniciarOperacion: opera sobre la conexion recibida
+     * y NO hace commit ni la cierra. Permite que el modulo de rutas meta el cambio
+     * de estado de la flota dentro de su propia transaccion (una sola unidad ACID,
+     * sin logica de compensacion).
+     *
+     * @return el id del conductor que quedo En Ruta con ese vehiculo.
+     */
+    public int iniciarOperacion(Connection cn, int idVehiculo) throws NegocioException, SQLException {
+        Vehiculo v = vehiculoDAO.buscarPorIdBloqueando(cn, idVehiculo);
+        if (v == null) {
+            throw new NegocioException("No existe un vehiculo con id " + idVehiculo + ".");
+        }
+        if (v.getEstado() != EstadoVehiculo.DISPONIBLE) {
+            throw new NegocioException("El vehiculo " + v.getPlaca() + " no esta Disponible (esta " + v.getEstado() + ").");
+        }
+        Asignacion asignacion = asignacionDAO.buscarVigentePorVehiculo(cn, idVehiculo);
+        if (asignacion == null) {
+            throw new NegocioException("El vehiculo " + v.getPlaca() + " no tiene conductor asignado.");
+        }
+        Conductor c = conductorDAO.buscarPorIdBloqueando(cn, asignacion.getIdConductor());
+        if (c.getEstado() != EstadoConductor.ACTIVO) {
+            throw new NegocioException("El conductor " + c.getNombreCompleto() + " no esta Activo (esta " + c.getEstado() + ").");
+        }
+        vehiculoDAO.actualizarEstado(cn, idVehiculo, EstadoVehiculo.EN_RUTA);
+        conductorDAO.actualizarEstado(cn, c.getIdConductor(), EstadoConductor.EN_RUTA);
+        return c.getIdConductor();
+    }
+
+    /**
      * Marca el vehiculo y su conductor asignado como En Ruta, en una sola transaccion.
      * Lo invoca RutaService al iniciar una hoja de ruta.
      *
@@ -255,27 +292,9 @@ public class FlotaService {
         try {
             cn = ConexionBD.obtenerConexion();
             cn.setAutoCommit(false);
-
-            Vehiculo v = vehiculoDAO.buscarPorIdBloqueando(cn, idVehiculo);
-            if (v == null) {
-                throw new NegocioException("No existe un vehiculo con id " + idVehiculo + ".");
-            }
-            if (v.getEstado() != EstadoVehiculo.DISPONIBLE) {
-                throw new NegocioException("El vehiculo " + v.getPlaca() + " no esta Disponible (esta " + v.getEstado() + ").");
-            }
-            Asignacion asignacion = asignacionDAO.buscarVigentePorVehiculo(cn, idVehiculo);
-            if (asignacion == null) {
-                throw new NegocioException("El vehiculo " + v.getPlaca() + " no tiene conductor asignado.");
-            }
-            Conductor c = conductorDAO.buscarPorIdBloqueando(cn, asignacion.getIdConductor());
-            if (c.getEstado() != EstadoConductor.ACTIVO) {
-                throw new NegocioException("El conductor " + c.getNombreCompleto() + " no esta Activo (esta " + c.getEstado() + ").");
-            }
-            vehiculoDAO.actualizarEstado(cn, idVehiculo, EstadoVehiculo.EN_RUTA);
-            conductorDAO.actualizarEstado(cn, c.getIdConductor(), EstadoConductor.EN_RUTA);
-
+            int idConductor = iniciarOperacion(cn, idVehiculo);
             cn.commit();
-            return c.getIdConductor();
+            return idConductor;
         } catch (SQLException e) {
             revertir(cn);
             throw new NegocioException("Error de base de datos al iniciar la operacion: " + e.getMessage(), e);
@@ -287,26 +306,33 @@ public class FlotaService {
         }
     }
 
+    /**
+     * Version transaccional de finalizarOperacion: opera sobre la conexion recibida
+     * y NO hace commit ni la cierra.
+     */
+    public void finalizarOperacion(Connection cn, int idVehiculo) throws NegocioException, SQLException {
+        Vehiculo v = vehiculoDAO.buscarPorIdBloqueando(cn, idVehiculo);
+        if (v == null) {
+            throw new NegocioException("No existe un vehiculo con id " + idVehiculo + ".");
+        }
+        if (v.getEstado() != EstadoVehiculo.EN_RUTA) {
+            throw new NegocioException("El vehiculo " + v.getPlaca() + " no esta En Ruta.");
+        }
+        vehiculoDAO.actualizarEstado(cn, idVehiculo, EstadoVehiculo.DISPONIBLE);
+
+        Asignacion asignacion = asignacionDAO.buscarVigentePorVehiculo(cn, idVehiculo);
+        if (asignacion != null) {
+            conductorDAO.actualizarEstado(cn, asignacion.getIdConductor(), EstadoConductor.ACTIVO);
+        }
+    }
+
     /** Devuelve vehiculo y conductor a Disponible/Activo al finalizar la ruta. */
     public void finalizarOperacion(int idVehiculo) throws NegocioException {
         Connection cn = null;
         try {
             cn = ConexionBD.obtenerConexion();
             cn.setAutoCommit(false);
-
-            Vehiculo v = vehiculoDAO.buscarPorIdBloqueando(cn, idVehiculo);
-            if (v == null) {
-                throw new NegocioException("No existe un vehiculo con id " + idVehiculo + ".");
-            }
-            if (v.getEstado() != EstadoVehiculo.EN_RUTA) {
-                throw new NegocioException("El vehiculo " + v.getPlaca() + " no esta En Ruta.");
-            }
-            vehiculoDAO.actualizarEstado(cn, idVehiculo, EstadoVehiculo.DISPONIBLE);
-
-            Asignacion asignacion = asignacionDAO.buscarVigentePorVehiculo(cn, idVehiculo);
-            if (asignacion != null) {
-                conductorDAO.actualizarEstado(cn, asignacion.getIdConductor(), EstadoConductor.ACTIVO);
-            }
+            finalizarOperacion(cn, idVehiculo);
             cn.commit();
         } catch (SQLException e) {
             revertir(cn);

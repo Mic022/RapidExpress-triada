@@ -7,6 +7,8 @@ import com.rapidexpress.model.EstadoConductor;
 import com.rapidexpress.model.TipoLicencia;
 import com.rapidexpress.service.ConductorService;
 
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.List;
 
 /** Controlador del modulo de personal (conductores) y sus asignaciones. */
@@ -69,5 +71,10 @@ public class ConductorController {
 
     public Conductor obtenerConductorAsignadoA(int idVehiculo) throws NegocioException {
         return conductorService.obtenerConductorAsignadoA(idVehiculo);
+    }
+
+    /** Variante sobre una conexion en curso: la usa el modulo de rutas dentro de su transaccion. */
+    public Conductor obtenerConductorAsignadoA(Connection cn, int idVehiculo) throws SQLException {
+        return conductorService.obtenerConductorAsignadoA(cn, idVehiculo);
     }
 }

@@ -7,6 +7,8 @@ import com.rapidexpress.model.Vehiculo;
 import com.rapidexpress.service.FlotaService;
 
 import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -92,5 +94,20 @@ public class FlotaController {
 
     public void finalizarOperacion(int idVehiculo) throws NegocioException {
         flotaService.finalizarOperacion(idVehiculo);
+    }
+
+    // --- Variantes transaccionales: el modulo de rutas las llama dentro de SU
+    //     transaccion para que iniciar/cerrar una ruta sea una sola unidad ACID.
+
+    public Vehiculo buscarVehiculoBloqueando(Connection cn, int idVehiculo) throws SQLException {
+        return flotaService.buscarPorIdBloqueando(cn, idVehiculo);
+    }
+
+    public int iniciarOperacion(Connection cn, int idVehiculo) throws NegocioException, SQLException {
+        return flotaService.iniciarOperacion(cn, idVehiculo);
+    }
+
+    public void finalizarOperacion(Connection cn, int idVehiculo) throws NegocioException, SQLException {
+        flotaService.finalizarOperacion(cn, idVehiculo);
     }
 }

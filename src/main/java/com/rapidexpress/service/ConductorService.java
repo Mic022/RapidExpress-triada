@@ -145,13 +145,15 @@ public class ConductorService {
             cn = ConexionBD.obtenerConexion();
             cn.setAutoCommit(false);
 
-            Conductor c = conductorDAO.buscarPorIdBloqueando(cn, idConductor);
-            if (c == null) {
-                throw new NegocioException("No existe un conductor con id " + idConductor + ".");
-            }
+            // Orden de bloqueo fijo en todo el sistema: vehiculo antes que conductor
+            // (igual que FlotaService.iniciarOperacion y RutaService.iniciarRuta).
             Vehiculo v = vehiculoDAO.buscarPorIdBloqueando(cn, idVehiculo);
             if (v == null) {
                 throw new NegocioException("No existe un vehiculo con id " + idVehiculo + ".");
+            }
+            Conductor c = conductorDAO.buscarPorIdBloqueando(cn, idConductor);
+            if (c == null) {
+                throw new NegocioException("No existe un conductor con id " + idConductor + ".");
             }
             if (c.getEstado() != EstadoConductor.ACTIVO) {
                 throw new NegocioException("El conductor " + c.getNombreCompleto()
@@ -221,11 +223,16 @@ public class ConductorService {
     /** Conductor que actualmente maneja ese vehiculo, o null si no hay ninguno. */
     public Conductor obtenerConductorAsignadoA(int idVehiculo) throws NegocioException {
         try (Connection cn = ConexionBD.obtenerConexion()) {
-            Asignacion a = asignacionDAO.buscarVigentePorVehiculo(cn, idVehiculo);
-            return a == null ? null : conductorDAO.buscarPorId(cn, a.getIdConductor());
+            return obtenerConductorAsignadoA(cn, idVehiculo);
         } catch (SQLException e) {
             throw new NegocioException("Error de base de datos: " + e.getMessage(), e);
         }
+    }
+
+    /** Igual que el anterior pero sobre la conexion recibida (para transacciones ajenas). */
+    public Conductor obtenerConductorAsignadoA(Connection cn, int idVehiculo) throws SQLException {
+        Asignacion a = asignacionDAO.buscarVigentePorVehiculo(cn, idVehiculo);
+        return a == null ? null : conductorDAO.buscarPorId(cn, a.getIdConductor());
     }
 
     /** Conductores Activos con vehiculo asignado: candidatos para una hoja de ruta. */
