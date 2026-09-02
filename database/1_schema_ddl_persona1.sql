@@ -74,6 +74,11 @@ CREATE INDEX idx_mantenimiento_vehiculo ON mantenimientos(id_vehiculo);
 -- la columna generada 'activa' vale 1 mientras fecha_fin sea NULL y NULL
 -- cuando la asignacion ya se cerro. Como MySQL ignora los NULL en indices
 -- UNIQUE, la restriccion solo aplica sobre las asignaciones vigentes.
+--
+-- Los FK usan ON DELETE CASCADE (igual que mantenimientos): al eliminar un
+-- vehiculo o conductor se borra tambien su historial de asignaciones. El
+-- servicio impide borrar mientras exista una asignacion VIGENTE, asi que el
+-- cascade solo alcanza filas ya cerradas.
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS asignaciones_conductor_vehiculo (
     id_asignacion INT AUTO_INCREMENT PRIMARY KEY,
@@ -83,9 +88,9 @@ CREATE TABLE IF NOT EXISTS asignaciones_conductor_vehiculo (
     fecha_fin     DATETIME NULL,
     activa        TINYINT GENERATED ALWAYS AS (IF(fecha_fin IS NULL, 1, NULL)) STORED,
     CONSTRAINT fk_asignacion_conductor FOREIGN KEY (id_conductor)
-        REFERENCES conductores(id_conductor) ON UPDATE CASCADE,
+        REFERENCES conductores(id_conductor) ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_asignacion_vehiculo FOREIGN KEY (id_vehiculo)
-        REFERENCES vehiculos(id_vehiculo) ON UPDATE CASCADE,
+        REFERENCES vehiculos(id_vehiculo) ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT uk_conductor_asignacion_activa UNIQUE (id_conductor, activa),
     CONSTRAINT uk_vehiculo_asignacion_activa  UNIQUE (id_vehiculo, activa)
 ) ENGINE=InnoDB;
