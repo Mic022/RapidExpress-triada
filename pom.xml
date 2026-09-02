@@ -14,8 +14,9 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <!-- La Persona 3 cambiara esta clase por el Main definitivo -->
-        <main.class>com.rapidexpress.MainFlotaPruebas</main.class>
+        <!-- Main de pruebas integrado (flota + paquetes/rutas).
+             La Persona 3 lo cambiara por el Main definitivo. -->
+        <main.class>com.rapidexpress.MainRutasPruebas</main.class>
     </properties>
 
     <dependencies>
