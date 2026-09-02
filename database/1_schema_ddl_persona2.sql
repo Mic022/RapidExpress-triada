@@ -58,10 +58,13 @@ CREATE TABLE IF NOT EXISTS paquetes (
     fecha_registro     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     fecha_entrega      DATETIME NULL,
     CONSTRAINT uk_paquete_codigo UNIQUE (codigo_seguimiento),
+    -- Sin ON UPDATE CASCADE a proposito: id_cliente es un AUTO_INCREMENT que
+    -- nunca cambia, y MySQL 8 no deja usar una columna en un CHECK si su FK
+    -- tiene accion referencial distinta de RESTRICT/NO ACTION (error 3823).
     CONSTRAINT fk_paquete_remitente FOREIGN KEY (id_remitente)
-        REFERENCES clientes(id_cliente) ON UPDATE CASCADE,
+        REFERENCES clientes(id_cliente),
     CONSTRAINT fk_paquete_destinatario FOREIGN KEY (id_destinatario)
-        REFERENCES clientes(id_cliente) ON UPDATE CASCADE,
+        REFERENCES clientes(id_cliente),
     CONSTRAINT chk_paquete_peso CHECK (peso_kg > 0),
     CONSTRAINT chk_paquete_partes CHECK (id_remitente <> id_destinatario)
 ) ENGINE=InnoDB;
